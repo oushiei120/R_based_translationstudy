@@ -1,0 +1,177 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-01-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 連詞の割合
+
+# 
+
+```{r}
+suppressPackageStartupMessages({
+  library(gridExtra)
+  library(ggplot2)
+  library(showtext)
+  library(quanteda)
+  library(quanteda.textstats)
+  library(jiebaR)
+  library(readtext)
+  library(purrr)
+  library(tidyverse)
+  library(tidytext)
+  library(quanteda.textmodels)
+  library(quanteda.textplots)
+  library(fmsb)})
+
+
+showtext_auto()
+font_add("SourceHanSerif",regular = "/Library/Fonts/SourceHanSerif-Regular.ttc",
+         bold="SourceHanSerif-Bold.ttc")
+par(family = "SourceHanSerif")
+```
+
+
+#
+
+```{r}
+v0 <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/segment",docvarsfrom = "filenames") %>% corpus() %>% tokens(what="fasterword")
+
+
+```
+
+# 
+```{r}
+dict <- dictionary(list(并列 = c("和","跟","与","同","及","而","况","况且","何况","乃至"),
+                        承接 = c("则","乃","就","而","于是","至于","说到","此外","像","如","一般","比方"),
+                        转折 = c("却","但是","然而","而","偏偏","只是","不过","至于","致","不料","岂知"),
+                        因果 = c("原来","因为","由于","以便","因此","所以","是故","以致"),
+                        选择 = c("或","抑"),
+                        假设 = c("若","如果","若是","假如","假使","倘若","要是","譬如"),
+                        比较 = c("像","好比","如同","似乎","等于","不如","不及","与其","不如"),
+                        让步 = c("虽然","固然","尽管","纵然","即使")))
+renshi <- tokens_lookup(v0, dictionary = dict) %>% dfm() 
+docnames(renshi) <- docvars(renshi,"docvar1")
+renshi_data <- renshi %>% convert(to="data.frame")
+
+renshi_data
+write.csv(renshi_data,"/Users/oushiei/Desktop/论文终稿/finalcode/data for print/連詞.csv")
+ 
+```
+
+#
+
+```{r}
+
+df_scaled<-renshi_data %>% select(-doc_id) %>% apply(2, scales::rescale)
+df_scaled
+rownames(df_scaled) <- renshi_data$doc_id
+df_scaled
+
+renshi_data %>% head()
+scale_data %>% head()
+
+```
+
+
+```{r}
+create_beautiful_radarchart <- function(data, color = "#00AFBB", 
+                                        vlabels = colnames(data), vlcex = 0.7,
+                                        caxislabels = NULL, title = NULL, ...){
+  radarchart(
+    data, axistype = 1,
+    # Customize the polygon
+    pcol = color, pfcol = scales::alpha(color, 0.5), plwd = 2, plty = 1,
+    # Customize the grid
+    cglcol = "grey", cglty = 1, cglwd = 0.8,
+    # Customize the axis
+    axislabcol = "grey", 
+    # Variable labels
+    vlcex = vlcex, vlabels = vlabels,
+    caxislabels = caxislabels, title = title, 
+    family = "SourceHanSerif",
+    cex = 1.2
+  )
+}
+op <- par(mar = c(1, 2, 2, 2))
+# Create the radar charts
+create_beautiful_radarchart(
+  data = df, caxislabels = c(0, 5, 10, 15, 20),
+  color = c("#00AFBB", "#E7B800", "#FC4E07")
+)
+# Add an horizontal legend
+legend(
+  x = "bottom", legend = rownames(df[-c(1,2),]), horiz = TRUE,
+  bty = "n", pch = 20 , col = c("#00AFBB", "#E7B800", "#FC4E07"),
+  text.col = "black", cex = 1, pt.cex = 1.5
+  )
+```
+
+
+```{r}
+col_max <- apply(df_scaled, 2, max)
+col_min <- apply(df_scaled, 2, min)
+col_mean <- apply(df_scaled, 2, mean)
+col_summary <- t(data.frame(Max = col_max, Min = col_min, Average = col_mean))##变成表格
+df_scaled2 <- as.data.frame(rbind(col_summary, df_scaled))
+head(df_scaled2)
+
+```
+
+values = c('#3A76A9','#D13021','#FDBF7B','#804B23','#81D8DD'
+vlabels: variable labels
+vlcex: controls the font size of variable labels #变量标签的大小
+
+pcol: line color #线的颜色
+pfcol: fill color
+plwd: line width
+plty: line types. Can be a numeric vector 1:6 or a character vector c(“solid”, “dashed”, “dotted”, “dotdash”, “longdash”, “twodash”). To remove the line, use plty = 0 or plty = “blank”.
+cglcol: line color
+cglty: line type
+cglwd: line width
+axislabcol: color of axis label and numbers. Default is “blue”.
+caxislabels: Character vector to be used as labels on the center axis.
+
+
+```{r}
+
+opar <- par() 
+# Define settings for plotting in a 3x4 grid, with appropriate margins:
+
+
+op <- par(mar = c(1, 1, 1, 1)+0.2)
+par(oma = c(1, 2, 1, 1))
+par(mfrow = c(1,3))
+colors=c("#DE3533", "#0047AB", "#006644",
+                               "#10C25B", "#808080","#FF8000")
+ 
+for (i in 4:6) {
+  radarchart(
+    df_scaled2[c(1:3, i), ],
+    pfcol = c("#99999980",NA),
+    pcol= c(NA,colors[i-3]), plty = 1, plwd = 2,line=-5,
+    title = row.names(df_scaled2)[i],
+    vlcex=1.3,calcex=1.2,palcex=2,
+    family = "SourceHanSerif", cex.main = 2
+  )
+ }
+
+
+for (i in 7:9) {
+  radarchart(
+    df_scaled2[c(1:3, i), ],
+    pfcol = c("#99999980",NA),
+    pcol= c(NA,colors[i-3]), plty = 1, plwd = 2,line=-5,
+    title = row.names(df_scaled2)[i],
+    vlcex=1.3,calcex=1.2,palcex=2,
+    family = "SourceHanSerif", cex.main = 2
+  )
+ }
+
+```
+

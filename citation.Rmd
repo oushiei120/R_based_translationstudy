@@ -1,0 +1,72 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 
+
+```{r}
+suppressPackageStartupMessages({
+library(quanteda)
+library(quanteda.textstats)
+library(quanteda.textmodels)
+library(quanteda.textplots)
+library(quanteda.corpora)
+library(readtext)
+library(jiebaR)
+library(purrr)
+library(tidyr)
+library(tidyverse)
+library(tidytext)
+library(patchwork)
+library(dplyr)
+library(lattice)
+library(showtext)
+library(stringi)
+library(gridExtra)
+library(ggplot2)
+library(fmsb)
+library(extrafont)
+library(devtools)
+library(dendextend)
+library(factoextra)
+library(caret)
+library(splitstackshape)
+library(purrr)
+  })
+
+```
+
+```{r}
+v1 <- read.csv("/Users/oushiei/Desktop/论文终稿/finalcode/data for print/package.csv",header = F)
+v1 %>% str()
+v1$V1 <- factor(v1$V1)
+v2 <- v1 %>%unique() %>% as.tibble()
+v2
+#write.csv(v2,"/Users/oushiei/Desktop/论文终稿/finalcode/data for print/package.csv")
+citation("purrr")
+```
+
+
+```{r}
+library(purrr)
+
+c("purrr","quanteda","readtext") %>%
+  map(citation)
+
+```
+
+```{r}
+library(dplyr)
+report::cite_packages() 
+
+d1
+write.csv(d1,"/Users/oushiei/Downloads/cita.csv")
+```
+

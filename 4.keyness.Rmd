@@ -1,0 +1,179 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-01-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# keyness
+
+#　パッケージを読み込む
+```{r}
+suppressPackageStartupMessages({
+  library(quanteda)
+  library(quanteda.textstats)
+  library(jiebaR)
+  library(readtext)
+  library(purrr)
+  library(tidyverse)
+  library(tidytext)
+  library(showtext)
+  library(quanteda.textplots)
+  library(extrafont)})
+
+font_import(paths="/Library/Fonts/chinese font")## font が保存されるところを書き入れ
+loadfonts(device="all")
+fonttable() %>%dplyr::filter(grepl("SourceHanSerif",fontfile))# SourceHanSerifの名前を確認
+fonts() 
+```
+
+
+# データを読み込む
+```{r}
+#==========
+# nlpirにより分ち書き済みのテキストデータを読み込みましょ
+#==========
+corpus_six <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/segment",
+                       docvarsfrom = "filenames") %>% corpus()
+token_faster <- tokenize_fasterword(corpus_six)
+#==========
+# 記号と数字はいらないです
+#==========
+token_select <- token_faster  %>% 
+  tokens(remove_punct = TRUE, remove_numbers = TRUE) 
+#==========
+# docnameをきれいにして
+#==========
+docnames(token_select) <- corpus_six$docvar1
+#==========
+# dfm
+#==========
+dfm1 <- dfm(token_select)
+docvars(dfm1,"docvar1") <- docnames(dfm1)
+```
+
+# textstat_keyness
+訳者別
+
+```{r}
+docvars(dfm1)
+k1 <- textstat_keyness(dfm1,docvars(dfm1,"docvar1")=='吴树文') 
+k2 <- textstat_keyness(dfm1,docvars(dfm1,"docvar1")=='曹曼') 
+k3 <- textstat_keyness(dfm1,docvars(dfm1,"docvar1")=='杨爽') 
+k4 <- textstat_keyness(dfm1,docvars(dfm1,"docvar1")=='林少华') 
+k5 <- textstat_keyness(dfm1,docvars(dfm1,"docvar1")=='谭晶华徐建雄') 
+k6 <- textstat_keyness(dfm1,docvars(dfm1,"docvar1")=='郑民钦') 
+```
+
+# textplot_keynessにより図を生成する
+
+```{r}
+library(patchwork)
+t1 <- textplot_keyness(
+  k1,
+  show_reference = F,
+  show_legend = T,
+  n = 10L,
+  min_count = 2L,
+  margin = 0.3,
+  color = c("#00C78C", "gray"),
+  labelcolor = "black",
+  labelsize = 8,
+  font = "Source Han Serif TC VF"
+)+labs(caption = "(吴树文keyness)")+
+  theme(text=element_text(size=20))
+
+t2 <- textplot_keyness(
+  k2,
+  show_reference = F,
+  show_legend = T,
+  n = 10L,
+  min_count = 2L,
+  margin = 0.3,
+  color = c("#00C78C", "gray"),
+  labelcolor = "black",
+  labelsize = 8,
+  font ="Source Han Serif TC VF"
+)+labs(caption = "(曹曼keyness)")+
+  theme(text=element_text(size=20))
+
+t3 <- textplot_keyness(
+  k3,
+  show_reference = F,
+  show_legend = T,
+  n = 10L,
+  min_count = 2L,
+  margin = 0.3,
+  color = c("#00C78C", "gray"),
+  labelcolor = "black",
+  labelsize = 8,
+  font = "Source Han Serif TC VF"
+)+labs(caption = "(杨爽keyness)")+
+  theme(text=element_text(size=20))
+
+t4 <- textplot_keyness(
+  k4,
+  show_reference = F,
+  show_legend = T,
+  n = 10L,
+  min_count = 2L,
+  margin = 0.3,
+  color = c("#00C78C", "gray"),
+  labelcolor = "black",
+  labelsize = 8,
+  font ="Source Han Serif TC VF"
+)+labs(caption = "(林少华keyness)")+
+  theme(text=element_text(size=20))
+
+t5 <- textplot_keyness(
+  k5,
+  show_reference = F,
+  show_legend = T,
+  n = 10L,
+  min_count = 2L,
+  margin = 0.3,
+  color = c("#00C78C", "gray"),
+  labelcolor = "black",
+  labelsize = 8,
+  font = "Source Han Serif TC VF"
+)+labs(caption = "(谭晶华keyness)")+
+  theme(text=element_text(size=20))
+
+t6 <- textplot_keyness(
+  k6,
+  show_reference = F,
+  show_legend = T,
+  n = 10L,
+  min_count = 2L,
+  margin = 0.3,
+  color = c("#00C78C", "gray"),
+  labelcolor = "black",
+  labelsize = 8,
+  font = "Source Han Serif TC VF"
+)+labs(caption = "(郑民钦keyness)")+
+  theme(text=element_text(size=20))
+
+
+t1 | t2 |t3
+t4 | t5 |t6
+```
+
+```{r}
+kk1 <- k1 %>%slice(1:20) %>% mutate(num=1:20)
+kk2 <- k2 %>% slice(1:20)%>% mutate(num=1:20)
+kk3 <- k3 %>% slice(1:20)%>% mutate(num=1:20)
+kk4 <- k4 %>% slice(1:20)%>% mutate(num=1:20)
+kk5 <- k5 %>% slice(1:20)%>% mutate(num=1:20)
+kk6 <- k6 %>% slice(1:20)%>% mutate(num=1:20)
+csv_all <- rbind(kk1,kk2,kk3,kk4,kk5,kk6) %>% write.csv("/Users/oushiei/Desktop/论文终稿/finalcode/data for print/keyness.csv")
+```
+
+
+```{r}
+#kwic(token_select,"——",20) %>% write.csv("/Users/oushiei/Desktop/论文终稿/finalcode/data for print/ダッシュ.csv")
+```
+

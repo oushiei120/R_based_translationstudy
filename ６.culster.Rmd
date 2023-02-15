@@ -1,0 +1,361 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-02-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 
+
+```{r}
+suppressPackageStartupMessages({
+  library(quanteda)
+  library(quanteda.textstats)
+  library(readtext)
+  library(tidyverse)
+  library(tidytext)
+  library(showtext)
+  library(dendextend)
+})
+source("/Users/oushiei/Desktop/论文终稿/finalcode/font and theme.R")
+```
+
+
+```{r}
+#==========
+# data load
+#==========
+corpus_six_three <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/3_6_seg",
+                       docvarsfrom = "filenames") %>% corpus()
+corpus_six_three %>% docvars()
+token_faster <- tokenize_fasterword(corpus_six_three)
+token_select <- token_faster %>% 
+  tokens(remove_punct = TRUE, remove_numbers = TRUE) 
+#==========
+# docvars docnamesを変えましょ 
+#==========
+
+docnames(token_select) <- docnames(corpus_six_three)
+docvars(token_select,"author") <- docvars(corpus_six_three,"docvar1")
+docnames(token_select) <- docvars(token_select,"author") 
+docnames(token_select)
+docvars(token_select)
+#==========
+# 言葉の豊富さ
+#==========
+houhusa_six <- textstat_lexdiv(token_select,measure = c("C","MSTTR","MATTR","R", MATTR_window = 100L,
+                                       MSTTR_segment = 100L)) %>%tibble()
+houhusa_six <- houhusa_six %>% rename("docvar1" ="document")
+
+```
+
+```{r}
+#==========
+# data load
+#==========
+corpus_six_three_pos <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/3_6_pos",docvarsfrom = "filenames") %>% 
+  corpus()
+docvar_combine <- docvars(corpus_six_three_pos) %>% tibble() %>% mutate(doc=paste0(docvar1,"",docvar2))
+docnames(corpus_six_three_pos) <- docvar_combine$doc
+docvars(corpus_six_three_pos,"docvar1") <- NULL
+docvars(corpus_six_three_pos,"docvar2") <- NULL
+docvars(corpus_six_three_pos,"docvar1") <- docvar_combine$doc
+#==========
+# tibbleへ変換して
+#==========
+readc <- corpus_six_three_pos %>% tidy
+readc %>% head()
+#==========
+# 形態素と品詞のタグを分かちましょう
+#==========
+postoken <- readc%>%unnest_tokens(word, text, token = stringr::str_split, pattern = " ")
+postoken0 <- postoken %>% unnest_tokens(pos,word,token = stringr::str_split,pattern="/")
+postoken0
+pos <- postoken %>% ##
+  separate(word,
+           into = c("词语","pos"),
+           sep = "/",
+           extra = "drop")
+
+pos %>%slice(1000:1020)
+pos
+#==========
+#　翻訳者ごとに品詞を集計する
+#==========
+#形容詞、名詞、動詞、数量詞それぞれはa\n\v\qで始まる         
+a <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^a+")) %>% count(name = "形容词") %>% ungroup()
+n <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^n+")) %>% count(name = "名词") %>% ungroup()
+v <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^v+")) %>% count(name = "动词") %>% ungroup()
+q <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^q+")) %>% count(name = "量词") %>% ungroup()
+#代名詞r、前置詞p、接続詞c、助詞u、感動詞e、副詞d
+r <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^r+")) %>% count(name = "代词")  %>% ungroup()
+p <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^p+")) %>% count(name = "介词") %>% ungroup()
+c <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^c+")) %>% count(name = "连词") %>% ungroup()
+u <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^u+")) %>% count(name = "助词") %>% ungroup()
+e <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^e+")) %>% count(name = "叹词") %>% ungroup()
+d <- pos%>%group_by(docvar1,.drop = FALSE) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^d+")) %>% count(name = "副词") %>% ungroup()
+
+a;n;v;q;r;p;c;u;e;d
+all_data <- print(list(a,n,v,q,r,p,c,u,e,d) %>% reduce(inner_join, by='docvar1'))
+
+#==========
+# data load
+#==========
+token <- data.frame(token = c(吴树文 = 25218, 曹曼 = 19718, 
+杨爽 = 23894, 林少华 = 20142, 谭晶华徐建雄 = 25744, 
+郑民钦 = 23192))
+
+text=rownames(token) %>% as.list()
+token <-  token %>% mutate(text=text)
+token
+#==========
+# 前節で集計したデータを利用しましょう
+#==========
+all_data <- all_data %>% separate(docvar1,into = c("text", "num"), 
+           sep = "(?=[0-9])",remove = F) ;all_data
+all_ci <- merge(x=all_data,y=token,by = "text");all_ci
+#==========
+# 相対頻度に変換する
+#==========
+hin_all <- all_ci %>% pivot_longer(.,4:13,names_to = "cixing") %>% group_by(text) %>%
+  mutate(relative=value/token*100) %>% ungroup()
+#==========
+# より清潔なデータに
+#==========u
+hin_all
+data_wider <-  hin_all %>% select(-c(1,3,4,6))
+data_wider
+final_data <- data_wider %>% pivot_wider(names_from = cixing,values_from = relative) %>% data.frame()
+final_data
+```
+
+
+
+
+
+```{r}
+final_data
+houhusa_six
+new_1 <- merge(houhusa_six,final_data)
+
+```
+
+
+
+```{r}
+final_data1 <- new_1
+rownames(final_data1) <- final_data$docvar1
+#==========
+# クラスター分析をやってみましょ
+#==========
+final_data1 <- final_data1[,-1]
+final_data_scale <- final_data1 %>% scale() %>% dist()
+h <- final_data_scale %>% hclust(method = "average")
+plot(h,hang=-1)
+
+heatmap(as.matrix(final_data_scale))
+
+library("gridGraphics") 
+library(pheatmap)
+par(oma=c(0,0,0,20))
+as.matrix(dist_tmp)
+library(RColorBrewer)
+library(gplots)
+  
+c1 <- colorRampPalette(c("white","grey","black"))
+c2 <- c1(30)
+heatmap.2(as.matrix(final_data_scale),trace="none",#不显示trace
+          col=c2,#修改热图颜色
+          density.info = "none",#图例取消density
+          key.xlab ='Correlation',
+          cexRow = 1.1,cexCol = 1.1)+
+  theme_bw(base_family = "HiraKakuProN-W3")
+heatmap.2(as.matrix(scale))
+
+
+```
+
+
+```{r}
+
+#==========
+# token
+#==========
+n_gram_token <- token_faster %>% tokens()
+n_gram_token
+docnames(n_gram_token) <- docnames(corpus_six_three)
+docvars(n_gram_token,"docvar1") <- docvars(corpus_six_three,"docvar1")
+docnames(n_gram_token) <- docvars(n_gram_token,"docvar1") 
+#==========
+# n-gram 2 and 3
+#==========
+token_2ngram <- n_gram_token%>% tokens_ngrams(n=2)
+token_3ngram <- n_gram_token %>% tokens_ngrams(n=3)
+#==========
+# 文末、文頭表現(based on the 2gram)
+#==========
+tou_pattern_2 = c("，_*","。_*")
+mo_pattern_2=c("*_，","*_。")
+all_pattern_3=c("，_*","。_*","*_，","*_。")
+#
+tou_pattern_2gram <- tokens_select(token_2ngram, pattern = tou_pattern_2) %>% dfm()
+mo_pattern_2gram<- tokens_select(token_2ngram, pattern = mo_pattern_2) %>% dfm()
+all_pattern_2gram<- tokens_select(token_2ngram, pattern = all_pattern_3) %>% dfm()
+#==========
+# 文末、文頭表現(base on the 3gram)
+#==========
+tou_pattern_3 = c("，_*_*","。_*_*")
+mo_pattern_3=c("*_*_，","*_*_。")
+all_pattern_3 =c("，_*_*","。_*_*","*_*_，","*_*_。")
+#
+tou_pattern_3gram <- tokens_select(token_3ngram, pattern = tou_pattern_3)%>% dfm()
+mo_pattern_3gram<- tokens_select(token_3ngram, pattern = mo_pattern_3)%>% dfm()
+all_pattern_3gram <- tokens_select(token_3ngram, pattern = mo_pattern_3)%>% dfm()
+#==========
+# コンマの打ち方と句点の打ち方
+#==========
+konma_pattern_3 =c("*_，_*")
+kuten_pattern_3=c("*_。_*")
+konmakuten_pattern_3=c("*_，_*","*_。_*")
+#
+konma_pattern_3gram <- tokens_select(token_3ngram, pattern = konma_pattern_3)%>% dfm()
+kuten_pattern_3gram<- tokens_select(token_3ngram, pattern = kuten_pattern_3)%>% dfm()
+konmakuten_pattern_3gram <-  tokens_select(token_3ngram, pattern = konmakuten_pattern_3)%>% dfm()
+konmakuten_pattern_3gram
+#==========
+# クラスタ
+#==========
+
+#==========
+# 1
+#==========
+tou_pattern_2gram
+mo_pattern_2gram
+dfm_my=dfm_trim(all_pattern_3gram, min_termfreq = 20)
+dist_tmp = dfm_weight(dfm_my, scheme = "prop") %>% convert(to="data.frame")
+dist_tmp
+
+rownames(dist_tmp) <- dist_tmp$doc_id
+dist_tmp$doc_id <- NULL
+dist_tmp
+
+tree <- dist_tmp%>% 
+  dist() %>% 
+  hclust()
+
+dend <- tree %>% 
+  as.dendrogram()
+
+par(mfrow=c(1,2),mar = c(1, 1, 1, 6))
+dend %>% 
+  set('branches_k_color', k=6) %>% 
+  plot(horiz = T)
+title("句点＋単語、コンマ＋単語")
+dend %>% 
+  set('branches_k_color', k=6) %>% 
+  plot(horiz = T)
+title("単語＋句点、単語＋コンマ")
+par(mfrow=c(1,1),mar = c(8, 5, 3, 2))
+dend %>% 
+  set('branches_k_color', k=6) %>% 
+  plot(horiz = F)
+title("頻度20以上の文頭、文末表現2-gram")
+tstat_freq <- textstat_frequency(tou_pattern_2gram, n = 1, groups = docvar1)
+write.csv(tstat_freq,"/Users/oushiei/Desktop/论文终稿/finalcode/data for print/tou2gram.csv")
+tstat_freq <- textstat_frequency(mo_pattern_2gram, n = 1, groups = docvar1)
+write.csv(tstat_freq,"/Users/oushiei/Desktop/论文终稿/finalcode/data for print/mo2gram.csv")
+  #==========
+# 2
+#==========
+# konma_pattern_3 =c("*_，_*")
+# kuten_pattern_3=c("*_。_*")
+# konmakuten_pattern_3=c("*_，_*","*_。_*")
+konma_pattern_3gram
+kuten_pattern_3gram
+konmakuten_pattern_3gram 
+source("/Users/oushiei/Desktop/论文终稿/finalcode/font and theme.R")
+
+dfm_my=dfm_trim(konmakuten_pattern_3gram, min_termfreq = 2)
+dist_tmp = dfm_weight(dfm_my, scheme = "prop") %>% convert(to="data.frame")
+dist_tmp
+
+rownames(dist_tmp) <- dist_tmp$doc_id
+dist_tmp$doc_id <- NULL
+dist_tmp
+
+tree <- dist_tmp%>% 
+  dist() %>% 
+  hclust()
+
+dend <- tree %>% 
+  as.dendrogram()
+
+par(mfrow=c(1,2),mar = c(1, 1, 1, 6))
+dend %>% 
+  set('branches_k_color', k=6) %>% 
+  plot(horiz = T)
+title("コンマ前後の単語＋コンマ")
+
+
+dend %>% 
+  set('branches_k_color', k=6) %>% 
+  plot(horiz = T)
+title("句点前後の単語＋句点")
+
+par(mfrow=c(1,1),mar = c(8, 5, 3, 2))
+dend %>% 
+  set('branches_k_color', k=6) %>% 
+  plot(horiz = F)
+title("頻度20以上のコンマ、句点前後の単語3-gram")
+
+tstat_freq <- textstat_frequency(konma_pattern_3gram, n = 1, groups = docvar1)
+write.csv(tstat_freq,"/Users/oushiei/Desktop/论文终稿/finalcode/data for print/cor3.csv")
+tstat_freq <- textstat_frequency(kuten_pattern_3gram, n = 1, groups = docvar1)
+write.csv(tstat_freq,"/Users/oushiei/Desktop/论文终稿/finalcode/data for print/cor4.csv")
+
+
+#==========
+# 
+#==========
+
+
+tou_pattern_2 = c("，_*","。_*")
+mo_pattern_2=c("*_，","*_。")
+all_pattern_3=c("，_*","。_*","*_，","*_。")
+#
+tou_pattern_2gram <- tokens_select(token_2ngram, pattern = tou_pattern_2) %>% dfm()
+mo_pattern_2gram<- tokens_select(token_2ngram, pattern = mo_pattern_2) %>% dfm()
+all_pattern_2gram<- tokens_select(token_2ngram, pattern = all_pattern_3) %>% dfm()
+
+
+```
+
+```{r}
+#==========
+# correspondence
+#==========
+library("FactoMineR")
+library("factoextra")
+final_data1
+chisq <- chisq.test(final_data1)
+chisq
+res.ca <- CA(dddd, graph = FALSE)
+
+## repel= TRUE to avoid text overlapping (slow if many point)
+fviz_ca_biplot(res.ca, repel = TRUE)
+```
+

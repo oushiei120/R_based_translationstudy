@@ -1,0 +1,233 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-01-27"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load packages
+
+```{r}
+suppressPackageStartupMessages({
+  library(quanteda)
+  library(quanteda.textstats)
+  library(jiebaR)
+  library(readtext)
+  library(purrr)
+  library(tidyverse)
+  library(tidytext)
+  library(patchwork)})
+
+```
+
+# set my ggplot layout
+
+```{r}
+#==========
+# fontとthemeを事前に設定する
+#==========
+library(lattice)
+library(showtext)
+showtext_auto()
+font_add("SourceHanSerif",regular = "/Library/Fonts/SourceHanSerif-Regular.ttc",
+         bold="SourceHanSerif-Bold.ttc")
+par(family = "SourceHanSerif")
+#==========
+# set my theme 
+#==========
+theme_ou <- function(){ 
+    font <- "SourceHanSerif"   #assign font family up front
+    theme_minimal() %+replace%    #replace elements we want to change
+    theme(
+      panel.grid.major = element_blank(),    #strip major gridlines
+      panel.grid.minor = element_blank(),    #strip minor gridlines
+      axis.ticks = element_blank(),          #strip axis ticks
+      plot.title = element_text(             #title
+                   family = font,            #set font family
+                   size = 20,                #set font size
+                   face = 'bold',            #bold typeface
+                   hjust = 0,                #left align
+                   vjust = 0),               #raise slightly
+      plot.subtitle = element_text(          #subtitle
+                   family = font,            #font family
+                   size = 14),               #font size
+      plot.caption = element_text(           #caption
+                   family = font,            #font family
+                   size = 9,                 #font size
+                   hjust = 1),               #right align
+      axis.title = element_text(             #axis titles
+                   family = font,            #font family
+                   size = 15,
+                   face='bold'),               #font size
+      axis.text = element_text(              #axis text
+                   family = font,            #axis famuly
+                   size = 15),                #font size
+      axis.text.x = element_text(            #margin for axis text
+                    margin=margin(5, b = 10)),
+      legend.text = element_text(size=10,
+                                  family = font)
+   
+    )
+}
+```
+
+
+```{r}
+#==========
+#  segment
+#==========
+#中科院NLPLR形態素解析器による分ち書き済みのテキストデータ
+corpus_six <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/segment",
+                       docvarsfrom = "filenames") %>% corpus()
+# 分ち書きしたテキストをquantedaのtokenに
+token_faster <- tokenize_fasterword(corpus_six)
+# 言葉の豊富さを測るため記号、数字を一括削る
+token_select <- token_faster %>% 
+  tokens(remove_punct = TRUE, remove_numbers = TRUE) 
+
+# token のnameをテキストの書名にして
+docnames(token_select) <- docnames(corpus_six)
+docvars(token_select,"author") <- docvars(corpus_six,"docvar1")
+docnames(token_select) <- docvars(token_select,"author") 
+#==========
+# トークンで構成されているコーパスの名前と変量docvar処理ずみ
+#==========
+docvars(token_select)
+summary(token_select) 
+#==========
+# textstat_lexdiv関数により、言葉の豊富さを測る
+#==========
+houhusa <- textstat_lexdiv(token_select,measure = c("C","MSTTR","MATTR","R", MATTR_window = 100L,
+                                       MSTTR_segment = 100L))
+houhusa
+
+#==========
+# 言葉の豊富さと
+#==========
+library(psych)  
+houhusa_token <- cbind(houhusa,token) %>% tibble() %>%  rename("token"=".")
+pairs.panels(houhusa_token[,-1], cex.labels=2,pch=21, cex = 2, cex.axis = 2)
+
+#==========
+# 可視化するためにデータを再構造する
+#==========
+houhusa
+houhusa_data <- houhusa %>% as.tibble %>% pivot_longer(2:4,names_to = "houhusa",values_to = "value")
+houhusa_data
+
+````
+
+# 可視化
+```{r}
+#==========
+# 可視化する
+#==========
+
+library(ggh4x)
+library(lemon)
+library("RColorBrewer") 
+houhusa_data
+p1 <- houhusa_data%>% ggplot(aes(document,value,group=houhusa)) +
+  lemon::geom_pointline(distance=unit(5, 'pt')) +
+  geom_point(aes(document,value,shape=houhusa),size=3)+
+  scale_color_brewer()+
+  theme_ou()
+p1
+
+p2 <- houhusa_data %>% ggplot(aes(x=document,y=R,group=1)) +
+ lemon::geom_pointline(distance=unit(5, 'pt')) +
+  geom_point(aes(x=document,y=R),size=3)+
+  theme_ou()
+p2
+p1+p2
+#==========
+# base r
+#==========
+h1 <- houhusa %>% mutate(num=1:6)
+h1
+par(cex.axis=1.5,family = "SourceHanSerif")
+
+
+
+attach(h1)
+plot(num,C, type="b", xaxt = "n",
+     col="blue", ylab="y",
+     lty=1,
+     ylim=c(0.75,0.9),
+     lwd=3,cex=2,xlab="")
+# axis 
+axis(1, at=1:6, labels=h1$document)
+# add new line
+lines(num,MSTTR, col="red",
+      lty=2,lwd=3,cex=2,pch=2,type = "b")
+lines(num,MATTR, col="green",
+      lty=3,lwd=3,cex=2,pch=2,type = "b")
+# add new plot 
+par(new = TRUE)                             # Add new plot
+plot(num, R, pch = 1,              # Create second plot without axes
+     axes = FALSE,type="b", col="black",
+     ylab = "",xlab = "",lwd=3,cex=2,lty=1)
+axis(side = 4, at = pretty(range(R))+1)      # Add second axis
+mtext("R", side = 4, line = 3)             # Add second axis label
+# legend
+legend(2,33.2,legend=c("C","MSTTR","MATTR","R"), col=c("blue","red","green","black"),
+      lty=c(1,2,3,1),pch=c(1,2,2,1),ncol=1,cex=1.2)
+
+#==========
+# 述べ語数と異なり語数
+#==========
+token <- ntoken(token_select) %>% tibble 
+colnames(token) <- "token"
+dput(token)
+type <- ntype(token_select) %>% tibble
+colnames(type) <- "type"
+token;type
+#==========
+# 言葉の豊富さと述べ語数と異なり語数
+#==========
+
+tandttr <-houhusa %>% as_tibble()  %>% transform(token=token,type=type) %>% select(document,token,type)
+tandttr
+#==========
+# 可視化する
+#==========
+par(cex.axis=1.5,family = "SourceHanSerif")
+par(mfrow=c(2,1))
+barplot(tandttr$token, 
+        main = "延べ語数", 
+        xlab = "訳者", 
+        names.arg = tandttr$document, 
+        horiz = F)
+barplot(tandttr$type, 
+        main = "異なり語数", 
+        xlab = "訳者", 
+        names.arg = tandttr$document, 
+        horiz = F)
+tandttr
+par(mfrow=c(1,1))
+
+barplot(cbind(tandttr$token,tandttr$type)~ tandttr$document,
+        main = "語彙使用", 
+        xlab = "", 
+        beside=T,
+        col=c("yellow","lightblue"),
+        names.arg = tandttr$document, 
+        horiz = F,
+        legend.text = c("延べ語数", "異なり語数"))
+
+par(new = TRUE)                             # Add new plot
+plot(num, R, pch = 1,              # Create second plot without axes
+     axes = FALSE,type="b", col="black",
+     ylab = "",xlab = "",lwd=3,cex=2,lty=1)
+
+axis(side = 4, at = pretty(range(R)))      # Add second axis
+mtext("R", side = 4, line = 3)             # Add second axis label
+
+```
+

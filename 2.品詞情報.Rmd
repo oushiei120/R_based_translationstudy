@@ -1,0 +1,288 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-01-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 語彙
+
+```{r}
+suppressPackageStartupMessages({
+  library(quanteda)
+  library(quanteda.textstats)
+  library(jiebaR)
+  library(readtext)
+  library(purrr)
+  library(tidyverse)
+  library(tidytext)
+  library(dplyr)
+  library(lattice)
+  library(showtext)
+  library(stringi)
+  library(patchwork)
+  library(tidyverse)})
+
+```
+
+```{r}
+
+showtext_auto()
+font_add("SourceHanSerif",regular = "/Library/Fonts/SourceHanSerif-Regular.ttc")
+par(family = "SourceHanSerif")
+library(showtext)
+showtext_auto()
+font_add("SourceHanSerif",regular = "/Library/Fonts/SourceHanSerif-Regular.ttc",
+         bold="SourceHanSerif-Bold.ttc")
+theme_ou <- function(){ 
+    font <- "SourceHanSerif"   #assign font family up front
+    theme_minimal() %+replace%    #replace elements we want to change
+    theme(
+      panel.grid.major = element_blank(),    #strip major gridlines
+      panel.grid.minor = element_blank(),    #strip minor gridlines
+      axis.ticks = element_blank(),          #strip axis ticks
+      plot.title = element_text(             #title
+                   family = font,            #set font family
+                   size = 20,                #set font size
+                   face = 'bold',            #bold typeface
+                   hjust = 0,                #left align
+                   vjust = 0),               #raise slightly
+      plot.subtitle = element_text(          #subtitle
+                   family = font,            #font family
+                   size = 14),               #font size
+      plot.caption = element_text(           #caption
+                   family = font,            #font family
+                   size = 9,                 #font size
+                   hjust = 1),               #right align
+      axis.title = element_text(             #axis titles
+                   family = font,            #font family
+                   size = 15,
+                   face='bold'),               #font size
+      axis.text = element_text(              #axis text
+                   family = font,            #axis famuly
+                   size = 15),                #font size
+      axis.text.x = element_text(            #margin for axis text
+                    margin=margin(5, b = 10)),
+      legend.text = element_text(size=15,
+                                  family = font,,face='bold'),
+      strip.background = element_blank(),
+  strip.text.x = element_blank()
+   
+    )
+}
+```
+
+# nlplr形態素解析器よりpos済みのテキストを読み込み
+```{r}
+read <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/pos",docvarsfrom = "filenames")
+readc <- read %>% corpus %>% tidy
+readc %>% head()
+
+```
+
+# 形態素と品詞情報を別々のcolumに保存する
+
+```{r}
+postoken <- readc%>%unnest_tokens(word, text, token = stringr::str_split, pattern = " ")
+postoken0 <- postoken %>% unnest_tokens(pos,word,token = stringr::str_split,pattern="/")
+postoken0
+pos <- postoken %>% ##
+  separate(word,
+           into = c("词语","pos"),
+           sep = "/",
+           extra = "drop")
+pos %>%slice(1000:1020)
+```
+# 延べ語数と品詞情報を数える
+```{r}
+#==========
+#　翻訳者ごとに品詞を集計する
+#==========
+#形容詞、名詞、動詞、数量詞それぞれはa\n\v\qで始まる         
+a <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^a+")) %>% count(name = "形容词")          
+n <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^n+")) %>% count(name = "名词")
+v <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^v+")) %>% count(name = "动词")
+q <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^q+")) %>% count(name = "量词")
+a;n;v;q
+anvq <- print(list(a,n,v,q) %>% reduce(inner_join, by='docvar1'))
+#代名詞r、前置詞p、接続詞c、助詞u、感動詞e、副詞d
+r <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^r+")) %>% count(name = "代词") 
+p <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^p+")) %>% count(name = "介词")
+c <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^c+")) %>% count(name = "连词")
+u <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^u+")) %>% count(name = "助词")
+e <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^e+")) %>% count(name = "叹词")
+d <- pos%>%group_by(docvar1) %>%  
+  dplyr::filter(str_detect(pos, pattern = "^d+")) %>% count(name = "副词")
+r;p;c;u;e;d
+rpcued <- print(list(r,p,c,u,e,d) %>% reduce(inner_join, by='docvar1'))
+
+
+```
+
+#　データの再構造
+
+```{r}
+anvq #実詞
+rpcued #虚詞
+
+token <- structure(list(token = c(吴树文 = 25218L, 曹曼 = 19718L, 
+杨爽 = 23894L, 林少华 = 20142L, 谭晶华徐建雄 = 25744L, 
+郑民钦 = 23192L)), class = c("tbl_df", "tbl", "data.frame"
+), row.names = c(NA, -6L))
+
+#==========
+# 前節で集計したデータを利用しましょ
+#==========
+shici <- cbind(anvq,token)
+xuci <- cbind(rpcued,token)
+#==========
+# 相対頻度に変換する
+#==========
+hin_shi <- shici %>% pivot_longer(.,2:5,names_to = "cixing") %>% group_by(docvar1) %>%
+  mutate(relative=value/token*100)
+hin_xu <- xuci %>% pivot_longer(.,2:7,names_to = "cixing") %>% group_by(docvar1) %>%
+  mutate(relative=value/token*100)
+
+#ここにある相対頻度を簡単な例で説明すれば、
+#当テキストにある形容詞がのべ語数にしめる割合。
+```
+
+# 可視化
+```{r}```{r}```{r}
+
+hin_shi
+options(digits = 2)
+ggplot(data=hin_shi,aes(cixing,relative,group=docvar1,fill=docvar1,label=relative))+
+  geom_bar(stat="identity",
+           position="dodge",width=0.9,size=0.5)+
+  geom_text(aes(cixing,relative,group=docvar1,label=round(relative,2)),
+           position = position_dodge(width = .9),vjust = -.25)+
+  scale_fill_manual(values=c("#DE3533", "#0047AB", "#006644",
+                               "#10C25B", "#808080","#FF8000"))+
+ facet_wrap(~ cixing, scales = "free",)+
+  theme_ou()+
+  labs(title = "実詞の相対頻度",x="",y="")+
+   theme(
+    legend.position = "left"
+    )
+
+ggplot(data=hin_xu,aes(cixing,relative,fill=docvar1,label=relative))+
+  geom_bar(stat="identity",
+           position="dodge",width=0.9,size=0.5)+
+  geom_text(aes(cixing,relative,group=docvar1,label=round(relative,2)),
+           position = position_dodge(width = .9),vjust = -.25)+
+  scale_fill_manual(values=c("#DE3533", "#0047AB", "#006644",
+                               "#10C25B", "#808080","#FF8000"))+
+  theme_ou()+
+  facet_wrap(~ cixing, scales = "free",)+
+  labs(title = "虚詞の相対頻度",x="",y="")+
+   theme(
+    legend.position=0
+    )
+```
+
+# 実詞と虚詞とのべ語数の関係を掘り下げる
+
+```{r}
+sum_shi <- hin_shi %>% group_by(docvar1) %>% summarise(shi_sum =sum(relative))
+sum_xu <- hin_xu %>% group_by(docvar1) %>% summarise(xu_sum =sum(relative))
+sumtwo <- mutate(sum_shi,sum_xu,token) %>% rename(実詞=shi_sum,虚詞=xu_sum) 
+attach(sumtwo)
+library(psych)   
+pairs.panels(sumtwo[,-1], cex.labels=3,pch=21, cex = 1, cex.axis = 2)
+sumtwo[,-1] %>% 
+  GGally::ggscatmat()
+#==========
+# barplot
+#==========
+sumtwo_longer <- sumtwo%>% pivot_longer(2:3,names_to = "品詞","valu")
+sumtwo_longer
+sumtwo_longer %>% ggplot(aes(x=factor(docvar1),y=value,group=`品詞`,fill=`品詞`))+
+    geom_bar(stat = "identity",position = "dodge")
+sumtwo_longer
+sumtwo_longer %>% ggplot(aes(x=factor(docvar1)))+
+    geom_bar(aes(y=token),stat = "identity",position = "dodge",fill="#006644")+
+    geom_line(aes(y=value*200,group=`品詞`,color=`品詞`))+
+  scale_y_continuous(
+    name = "First Axis",
+    sec.axis = sec_axis(~./200, name="Second Axis")
+  )+
+  theme_ou()+ theme(axis.title.x = element_blank())
+#==========
+# base r barplot + lineplot
+#==========
+sumtwo <- sumtwo %>% mutate(num =1:6)
+attach(sumtwo)
+barplot(sumtwo$token~ sumtwo$num,
+        main = "延べ語数", 
+        xlab = "", 
+        beside=T,
+        col="lightblue",
+        density=20,
+        names.arg =  sumtwo$docvar1, 
+        horiz = F)
+sumtwo
+par(new = TRUE)                             # Add new plot
+plot(num, 実詞, pch = 1, col = "#484891",              # Create second plot without axes
+     axes = FALSE, xlab = "", ylab = "",type="b")
+  par(new = TRUE)  
+lines(num, 虚詞, pch = 2, col = "#984B4B",
+     xlab = "", ylab = "",type="b" )
+
+axis(side = 4, at = pretty(range(実詞)))      
+
+#==========
+# 3d plot
+#==========
+library("plot3D")
+sumtwo
+attach(sumtwo)
+library(scatterplot3d)
+s1 <- sumtwo$実詞
+s2 <- sumtwo$虚詞
+s3 <- as.numeric(sumtwo$token)
+s4 <- sumtwo$docvar1
+scatterplot3d(s1,s3,s2,
+              xlab="断落数", ylab="字数", zlab="词数",
+              angle=45,main = "《红楼梦》")
+text3D(s1,s3,s2,
+                       labels = sumtwo$docvar1)
+sumtwo
+# Create a scatter plot
+attach(sumtwo)
+
+# Plot texts
+par(family = "SourceHanSerif")
+text3D(s1, s2, s3, 
+  labels = s4, colvar = s3, 
+  col = gg.col(80), theta = 60, phi = 5,
+  xlab = "x：実詞率%", ylab = "y：虚詞率%", zlab = "z：のべ語数", 
+  main = "", cex = 1.2,cex.main = 2,cex.lab = 2,
+  bty = "b2", ticktype = "detailed", d = 2,
+  clab = c("のべ語数"), adj = 0.5, font = 2)
+ #“b”, “b2”, “f”, “g”, “bl”, “bl2”, “u”, “n”
+
+scatter3D(s1, s2, s3, 
+  theta = 60, phi = 25,
+  main = "", cex = 1.2, 
+  bty = "b2", ticktype = "detailed", d = 2,
+  clab = c("のべ語数"), adj = 0.5, font = 2, type = "h", 
+           ticktype = "detailed",add = T)
+
+ 
+```
+
+

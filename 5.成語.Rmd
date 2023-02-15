@@ -1,0 +1,137 @@
+---
+title: "Untitled"
+author: "oushiei"
+date: "2023-01-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 
+
+```{r}
+suppressPackageStartupMessages({
+  require(quanteda)
+  require(quanteda.corpora)
+  library(tidytext)
+  library(devtools)
+  library(jiebaR)
+  library(readtext)
+  library(tidyverse)
+  library(tidyr)
+  library(quanteda.textstats)
+  library(showtext)
+})
+showtext_auto()
+font_add("SourceHanSerif",regular = "/Library/Fonts/SourceHanSerif-Regular.ttc")
+par(family = "SourceHanSerif")
+library(showtext)
+showtext_auto()
+font_add("SourceHanSerif",regular = "/Library/Fonts/SourceHanSerif-Regular.ttc",
+         bold="SourceHanSerif-Bold.ttc")
+theme_ou <- function(){ 
+    font <- "SourceHanSerif"   #assign font family up front
+    theme_minimal() %+replace%    #replace elements we want to change
+    theme(
+      panel.grid.major = element_blank(),    #strip major gridlines
+      panel.grid.minor = element_blank(),    #strip minor gridlines
+      axis.ticks = element_blank(),          #strip axis ticks
+      plot.title = element_text(             #title
+                   family = font,            #set font family
+                   size = 20,                #set font size
+                   face = 'bold',            #bold typeface
+                   hjust = 0,                #left align
+                   vjust = 0),               #raise slightly
+      plot.subtitle = element_text(          #subtitle
+                   family = font,            #font family
+                   size = 14),               #font size
+      plot.caption = element_text(           #caption
+                   family = font,            #font family
+                   size = 9,                 #font size
+                   hjust = 1),               #right align
+      axis.title = element_text(             #axis titles
+                   family = font,            #font family
+                   size = 15,
+                   face='bold'),               #font size
+      axis.text = element_text(              #axis text
+                   family = font,            #axis famuly
+                   size = 15),                #font size
+      axis.text.x = element_text(            #margin for axis text
+                    margin=margin(5, b = 10)),
+      legend.text = element_text(size=15,
+                                  family = font,,face='bold'),
+      strip.background = element_blank(),
+  strip.text.x = element_blank()
+   
+    )
+}
+```
+
+```{r}
+setwd("/Users/oushiei/Desktop/论文终稿/finalcode")
+my_worker <- worker(bylines=T,symbol = T,
+                    user="data/dictionary/【源文件】成语俗语.dict")
+
+corpus_noseg <- readtext("/Users/oushiei/Desktop/论文终稿/finalcode/data/nothing",docvarsfrom = "filenames") %>%corpus() 
+docnames(corpus_noseg) <- docvars(corpus_noseg,"docvar1")
+corpus_noseg
+```
+
+
+```{r}
+text_corpus_tidy <-corpus_noseg %>%
+  tidy %>% 
+  mutate(textID = row_number())
+text_corpus_tidy 
+
+#==========
+# 
+#==========
+text_tokens <- text_corpus_tidy$text %>%
+  segment(jiebar = my_worker) %>%
+  as.tokens() 
+docnames(text_tokens) <- docnames(corpus_noseg)
+
+#==========
+# clean our token
+#==========
+token4 <- text_tokens %>%tokens(remove_punct = TRUE, remove_numbers = TRUE) %>% 
+  tokens_remove(pattern = stopwords("zh_cn", source = "marimo"),padding=F)%>% 
+  tokens_select(min_nchar = 4,max_nchar =4)
+
+  
+#==========
+# read idioms as a list 
+#========== 
+idioms<- read_csv("/Users/oushiei/Desktop/论文终稿/finalcode/data/dictionary/成语.csv",col_names ="list") %>% as.tibble()
+idioms_list <- idioms$list%>% as.character()
+idioms_list %>% summary()
+#==========
+# 
+#==========
+
+idioms_clean <- tokens_select(token4,pattern = idioms_list, selection = "keep")
+idioms_clean %>% head
+r1 <- ntoken(idioms_clean) %>%tibble() %>% rename("count"=".") 
+r1$name <-  docnames(text_tokens) 
+r1$count %>% mean
+
+
+values=c("#DE3533", "#0047AB", "#006644",
+                               "#10C25B", "#808080","#FF8000")
+ggplot(r1)+
+  geom_bar(aes(name,count,fill=name),stat = "identity")+
+  geom_text(aes(name,count,label=count),size=7)+
+  scale_fill_manual(values = values)+
+  geom_hline(yintercept=mean(r1$count), color="black",linewidth = 1.5)+
+  annotate("text", x=2, y=332, label="321.5", size=8, color="blue")+
+  theme_ou()+
+  labs(x="翻訳者",y="４字成語の使用頻度")+
+  theme(legend.position="none")
+
+                  
+
+```
+
